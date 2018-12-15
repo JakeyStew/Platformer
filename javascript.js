@@ -1,5 +1,5 @@
 //Request Animation frame loop.
-(function() {
+/*(function() {
     var lastTime = 0;
     var vendors = ['ms', 'moz', 'webkit', 'o'];
     for(var x = 0; x < vendors.length && !window.requestAnimationFrame; ++x) {
@@ -22,7 +22,12 @@
         window.cancelAnimationFrame = function(id) {
             clearTimeout(id);
         };
-}());
+}());*/
+
+(function () {
+    var requestAnimationFrame = window.requestAnimationFrame || window.mozRequestAnimationFrame || window.webkitRequestAnimationFrame || window.msRequestAnimationFrame;
+    window.requestAnimationFrame = requestAnimationFrame;
+})();
 
 //Start of game code
 var canvas = document.getElementById("canvas"),
@@ -37,7 +42,8 @@ var canvas = document.getElementById("canvas"),
         speed : 3,
         velX : 0,
         velY : 0,
-        jumping : false
+        jumping : false,
+        grounded: false
     },
     keys = [],
     friction = 0.8,
@@ -74,6 +80,32 @@ boxes.push({
     height: height - 710
 });
 
+//Box dimmensions (Platforms)
+boxes.push({
+    x: 120,
+    y: 650,
+    width: 500,
+    height: 10
+});
+boxes.push({
+    x: 250,
+    y: 600,
+    width: 250,
+    height: 10
+});
+boxes.push({
+    x: 120,
+    y: 450,
+    width: 10,
+    height: 200
+});
+boxes.push({
+    x: 500,
+    y: 550,
+    width: 300,
+    height: 10
+});
+
 //Canavas size
 canvas.width = width;
 canvas.height = height;
@@ -81,10 +113,11 @@ canvas.height = height;
 function update() {
     // check keys
     if (keys[38] || keys[87] || keys[32]) {
-        // up arrow
-        if (!player.jumping) {
+        // up arrow or space
+        if (!player.jumping && player.grounded) {
             player.jumping = true;
-            player.velY = -player.speed*2;
+            player.grounded = false; // We're not on the ground anymore!!
+            player.velY = -player.speed * 2;
         }
     }
     if (keys[39] || keys[68]) {
@@ -102,70 +135,82 @@ function update() {
 
     player.x += player.velX;
     player.y += player.velY;
-    if (player.x >= width-player.width) {
-        player.x = width-player.width;
-    } else if (player.x <= 0) {
-        player.x = 0;
-    }
-    if(player.y >= height-player.height){
-        player.y = height - player.height;
-        player.jumping = false;
-    }
     player.velX *= friction;
     player.velY += gravity;
 
     ctx.clearRect(0,0,width,height);
+
     //Draw out player
     ctx.fillStyle = "#FC5130";
     ctx.fillRect(player.x, player.y, player.width, player.height);
+
     //Draw boxes
     ctx.fillStyle = "#050401";
     ctx.beginPath();
+
+    player.grounded = false;
+    //Draw the box loop
     for (var i = 0; i < boxes.length; i++) {
         ctx.rect(boxes[i].x, boxes[i].y, boxes[i].width, boxes[i].height);
+        var dir = colCheck(player, boxes[i]);
+
+        if (dir === "l" || dir === "r") {
+            player.velX = 0;
+            player.jumping = false;
+        } else if (dir === "b") {
+            player.grounded = true;
+            player.jumping = false;
+        } else if (dir === "t") {
+            player.velY *= -1;
+        }
     }
+
+    if(player.grounded){
+        player.velY = 0;
+    }
+
     ctx.fill();
     //Run through update loop again
     requestAnimationFrame(update);
 }
 
 //Collision checking
-function colCheck() {
+function colCheck(shapeA, shapeB) {
     //get the vectors to check against
     var vX = (shapeA.x + (shapeA.width / 2)) - (shapeB.x + (shapeB.width / 2 )),
-        vY = (shapeA.y + (shapeA.height / 2)) - (shapeB.y + (shapeB.width / 2 )),
+        vY = (shapeA.y + (shapeA.height / 2)) - (shapeB.y + (shapeB.height / 2 )),
         //Add the half widths/heights of the objects
         hWidths = (shapeA.width / 2) + (shapeB.width / 2),
-        hHeights = (shapeA.heights / 2) + (shapeB.width / 2),
+        hHeights = (shapeA.height / 2) + (shapeB.height / 2),
         colDir = null;
 
     //If the x/y vector are less than half the width/height, they must be inside the object, causing a collision.
     if (Math.abs(vX) < hWidths && Math.abs(vY) < hHeights) { // figures out on which side we are colliding (top, bottom, left, or right)
-        if (vY > 0) {
-            colDir = "t";
-            shapeA.y += oY;
+        var oX = hWidths - Math.abs(vX),
+            oY = hHeights - Math.abs(vY);
+        if (oX >= oY) {
+            if (vY > 0) {
+                colDir = "t";
+                shapeA.y += oY;
+            } else {
+                colDir = "b";
+                shapeA.y -= oY;
+            }
         } else {
-            colDir = "b";
-            shapeA.y -= oY;
-        }
-    } else {
-        if (vX > 0) {
-            colDir = "l";
-            shapeA.x += oX;
-        } else {
-            colDir = "r";
-            shapeA.x -= oX;
+            if (vX > 0) {
+                colDir = "l";
+                shapeA.x += oX;
+            } else {
+                colDir = "r";
+                shapeA.x -= oX;
+            }
         }
     }
     return colDir;
 }
 
 //Event listeners
-window.addEventListener("load", function(){
-    update();
-  });
-
-  document.body.addEventListener("keydown", function(e) {
+document.body.addEventListener("keydown", function(e) {
     keys[e.keyCode] = true;
 });
  
@@ -173,6 +218,9 @@ document.body.addEventListener("keyup", function(e) {
     keys[e.keyCode] = false;
 });
 
+window.addEventListener("load", function(){
+    update();
+});
 //Prevents the window scrolling down when space is pressed.
 window.addEventListener('keydown', function(e) {
     if(e.keyCode == 32 && e.target == document.body) {
