@@ -1,5 +1,5 @@
 //Request Animation frame loop.
-/*(function() {
+(function() {
     var lastTime = 0;
     var vendors = ['ms', 'moz', 'webkit', 'o'];
     for(var x = 0; x < vendors.length && !window.requestAnimationFrame; ++x) {
@@ -22,12 +22,7 @@
         window.cancelAnimationFrame = function(id) {
             clearTimeout(id);
         };
-}());*/
-
-(function () {
-    var requestAnimationFrame = window.requestAnimationFrame || window.mozRequestAnimationFrame || window.webkitRequestAnimationFrame || window.msRequestAnimationFrame;
-    window.requestAnimationFrame = requestAnimationFrame;
-})();
+}());
 
 //Start of game code
 var canvas = document.getElementById("canvas"),
@@ -35,7 +30,7 @@ var canvas = document.getElementById("canvas"),
     width = 1280,
     height = 720,
     player = {
-        x : width / 2,
+        x : width / 20,
         y : height - 25,
         width : 25,
         height : 25,
@@ -43,13 +38,17 @@ var canvas = document.getElementById("canvas"),
         velX : 0,
         velY : 0,
         jumping : false,
-        grounded: false
+        grounded : false
     },
     keys = [],
     friction = 0.8,
-    gravity = 0.3;
+    gravity = 0.3,
+    score = 0;
+    lives = 3;
 
 var boxes = []
+var coins = []
+var lava = []
 
 //Box dimmensions (Edges of screen)
 boxes.push({
@@ -82,33 +81,123 @@ boxes.push({
 
 //Box dimmensions (Platforms)
 boxes.push({
-    x: 120,
-    y: 650,
-    width: 500,
-    height: 10
+    x: 10,
+    y: 685,
+    width: 200,
+    height: 25
 });
 boxes.push({
-    x: 250,
-    y: 600,
-    width: 250,
-    height: 10
+    x: 270,
+    y: 630,
+    width: 100,
+    height: 25
 });
 boxes.push({
-    x: 120,
-    y: 450,
+    x: 450,
+    y: 570,
+    width: 100,
+    height: 25
+});
+boxes.push({
+    x: 670,
+    y: 570,
+    width: 50,
+    height: 150
+});
+boxes.push({
+    x: 830,
+    y: 530,
+    width: 100,
+    height: 25
+});
+boxes.push({
+    x: 1030,
+    y: 480,
+    width: 100,
+    height: 25
+});
+boxes.push({
+    x: 1105,
+    y: 330,
+    width: 25,
+    height: 150
+});
+
+//coins dimmensions
+coins.push({
+    x: 20,
+    y: 667,
     width: 10,
-    height: 200
+    height: 10,
+    status: 1 //Status for draw (1)/no draw (0)
 });
-boxes.push({
-    x: 500,
+coins.push({
+    x: 315,
+    y: 610,
+    width: 10,
+    height: 10,
+    status: 1
+});
+coins.push({
+    x: 690,
     y: 550,
-    width: 300,
-    height: 10
+    width: 10,
+    height: 10,
+    status: 1
+});
+coins.push({
+    x: 1065,
+    y: 460,
+    width: 10,
+    height: 10,
+    status: 1
+});
+
+//Lava dimmensions
+lava.push({
+    x: 210,
+    y: 690,
+    width: 1070,
+    height: 25
 });
 
 //Canavas size
 canvas.width = width;
 canvas.height = height;
+
+function drawScore() {
+    ctx.font = "16px Montserrat";
+    ctx.fillStyle = "#FC5130";
+    ctx.fillText("Score: "+score, 18, 30);
+}
+
+function drawLives() {
+    ctx.font = "16px Montserrat";
+    ctx.fillStyle = "#FC5130";
+    ctx.fillText("Lives: "+lives, 18, 50);
+}
+
+function drawLava() {
+    for(var i = 0; i < lava.length; i++) {
+        ctx.beginPath();
+        ctx.rect(lava[i].x, lava[i].y, lava[i].width, lava[i].height);
+        ctx.fillStyle = "#B22222";
+        ctx.fill();
+        ctx.closePath();
+
+        //Collision Check (If hit lava, lose a life. If no lives restart game.)
+        if (colCheck(player, lava[i]) !== null) {
+            lives--;
+            if(lives == 0) {
+                alert("GAME OVER");
+                document.location.reload();
+            } else {
+                player.x = width / 20,
+                player.y = height - 25
+            }
+        }
+    }
+}
 
 function update() {
     // check keys
@@ -140,6 +229,12 @@ function update() {
 
     ctx.clearRect(0,0,width,height);
 
+    //Draw score + lives
+    drawScore();
+    drawLives();
+    //Draw lava
+    drawLava();
+
     //Draw out player
     ctx.fillStyle = "#FC5130";
     ctx.fillRect(player.x, player.y, player.width, player.height);
@@ -147,7 +242,6 @@ function update() {
     //Draw boxes
     ctx.fillStyle = "#050401";
     ctx.beginPath();
-
     player.grounded = false;
     //Draw the box loop
     for (var i = 0; i < boxes.length; i++) {
@@ -168,7 +262,40 @@ function update() {
     if(player.grounded){
         player.velY = 0;
     }
+    ctx.fill();
 
+    //Draw coins
+    ctx.fillStyle = "#FFDF00";
+    ctx.beginPath();
+    for (var j = 0; j < coins.length; j++) {
+        if (coins[j].status == 1) {
+            ctx.save();
+            var cx = coins[j].x + 0.5 * coins[j].width,   // x of shape center
+            cy = coins[j].y + 0.5 * coins[j].height; //y of shape center
+            ctx.translate(cx, cy);  //translate to center of shape
+            ctx.rotate( (Math.PI / 180) * 45);//rotate 25 degrees.
+            if(coins[j].effect  === 'tele'){
+                ctx.rotate( (Math.PI / 180) * coins[j].rotate);//rotate 25 degrees.
+                coins[j].rotate = (Math.PI / 180) * coins[j].rotate;
+            }
+            ctx.translate(-cx, -cy);            //translate center back to 0,0
+            ctx.fillStyle = coins[j].color;
+            ctx.fillRect(coins[j].x, coins[j].y, coins[j].width, coins[j].height);
+            ctx.restore();
+
+            //Check collision
+            if (colCheck(player, coins[j]) !== null) {
+                //If coin hit
+                if (coins[j].stay!==true)
+                {
+                    //Set status of brick to 0 (dont draw)
+                    coins[j].status = 0;
+                    //Increase score
+                    score++;
+                }
+            }
+        }
+    }
     ctx.fill();
     //Run through update loop again
     requestAnimationFrame(update);
@@ -190,18 +317,18 @@ function colCheck(shapeA, shapeB) {
             oY = hHeights - Math.abs(vY);
         if (oX >= oY) {
             if (vY > 0) {
-                colDir = "t";
+                colDir = "t"; //collided with Top
                 shapeA.y += oY;
             } else {
-                colDir = "b";
+                colDir = "b"; //collided with Bottom
                 shapeA.y -= oY;
             }
         } else {
             if (vX > 0) {
-                colDir = "l";
+                colDir = "l"; //collided with Left
                 shapeA.x += oX;
             } else {
-                colDir = "r";
+                colDir = "r"; //collided with Right
                 shapeA.x -= oX;
             }
         }
